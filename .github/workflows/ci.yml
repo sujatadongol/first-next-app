@@ -1,0 +1,91 @@
+name: CI
+
+# Runs on every PR and on pushes to main, but skips runs that only touch
+# docs/markdown so we don't burn CI minutes on non-code changes.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+
+# Cancel superseded runs on the same branch/PR.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
+
+  # Dependency vulnerability scan, split into a hard gate and a soft report.
+  # npm audit's severity bubbles UP the dependency chain: one moderate
+  # advisory in esbuild (used only by vitest's dev server) currently shows as
+  # "critical" against vitest and @vitest/coverage-v8 themselves, purely
+  # because of how deep they sit in that chain. That's real dev-tooling
+  # noise, not a real risk to your users, since none of it ships to
+  # production. So: production dependencies (--omit=dev) are audited at
+  # high-and-above and FAIL the job if anything turns up — that's the code
+  # that actually reaches users. Dev dependencies are audited too, but only
+  # reported (never fail the job) — visible to whoever reads the run, acted
+  # on deliberately, not silently blocking every push until someone gets
+  # around to a breaking vitest upgrade.
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+      - run: npm ci
+      - name: Audit production dependencies (blocking)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Audit dev dependencies (report only)
+        if: always()
+        run: npm audit --include=dev --audit-level=high || true
+
+  # Coverage-gated tests, matrixed across the two Node versions we support.
+  test:
+    name: Test (Node ${{ matrix.node-version }})
+    needs: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["20.x", "22.x"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+      - run: npm ci
+      - run: npm run test:coverage
+
+  build:
+    name: Build
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build

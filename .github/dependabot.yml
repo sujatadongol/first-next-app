@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Keep npm dependencies current — this is what actually resolves the kind
+  # of dev-tooling advisory the security job reports on but doesn't block.
+  # Dependabot opens a PR per update; your existing CI (lint/test/build)
+  # runs on that PR like any other, so a bad update gets caught before merge.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # Bundle routine minor/patch bumps into one PR instead of five, so
+      # they don't drown out the updates that actually need a careful look.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Keep the GitHub Actions themselves current too (actions/checkout,
+  # actions/setup-node) — easy to forget since they're not in package.json.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

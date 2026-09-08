@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# stray dir from a bridge-mount cleanup quirk during CI setup
+.next-stale-*/
+
+# vitest coverage output
+coverage/
+coverage-stale-*/
