@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Stray dirs left behind by remote-mount cleanup quirks during CI setup
+    // (rm -rf couldn't remove them; safe to delete by hand on this Mac).
+    ".next-stale-*/**",
+    "coverage/**",
+    "coverage-stale-*/**",
   ]),
 ]);
 
